@@ -41,7 +41,7 @@ void setup()
 
 #ifdef CONFIGURE_TIME_DATE
   rtc.SetDateTime(RtcDateTime(__DATE__, __TIME__));
-  printDateTime();
+  printInformation();
 #else
   if (!rtc.IsDateTimeValid())
   {
@@ -70,17 +70,33 @@ void setup()
 void loop()
 {
 #ifdef CONFIGURE_TIME_DATE
-  printDateTime();
+  printInformation();
   delay(1000);
 #else
-  // write led state according to time valid
-  digitalWrite(LED_PIN, !rtc.IsDateTimeValid());
+  // Everything ok then just show on/off state
+  if (rtc.IsDateTimeValid())
+  {
+    digitalWrite(LED_PIN, state != OFF);
+  }
+  // there's something wrong so say it with led blink
+  else
+  {
+    // set led according to state
+    static int count = 0;
+    static bool blinkState = HIGH;
+    if (++count % 50 == 0)
+    {
+      blinkState = !blinkState;
+      count = 0;
+    }
+    digitalWrite(LED_PIN, blinkState);
+  }
 
   bool buttonPress = digitalRead(BUTTON_PIN);
   while(digitalRead(BUTTON_PIN))
   {
     buttonPress = true;
-    Alarm.delay(1);
+    Alarm.delay(5);
   }
 
   switch (state)
@@ -102,11 +118,11 @@ void loop()
       }
   }
 
-  Alarm.delay(1);
+  Alarm.delay(5);
 #endif
 }
 
-void printDateTime()
+void printInformation()
 {
 #ifndef CONFIGURE_TIME_DATE
   Serial.print("State: ");
@@ -129,7 +145,7 @@ void turnOn()
   digitalWrite(RINGER_PIN, HIGH);
   state = ON;
 
-  printDateTime();
+  printInformation();
 }
 
 void turnOff()
@@ -146,7 +162,7 @@ void turnOff()
   // Stay off only for a day
   lastTurnOnAlarm = Alarm.timerOnce(24, 0, 0, turnOn);
 
-  printDateTime();
+  printInformation();
 }
 
 void ring()
@@ -169,5 +185,5 @@ void ring()
   // Stay off only for a day
   lastTurnOnAlarm = Alarm.timerOnce(0, 0, RING_DURATION, turnOn);
 
-  printDateTime();
+  printInformation();
 }
