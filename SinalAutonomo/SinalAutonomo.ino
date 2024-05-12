@@ -31,6 +31,10 @@ void setup()
 {
   Serial.begin(9600);
 
+  // turn off builtin led
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+
   rtc.Begin();
   rtc.SetIsRunning(true);
   rtc.SetIsWriteProtected(false);
@@ -50,10 +54,6 @@ void setup()
 
   Alarm.alarmRepeat(dowSunday, 11, 0, 0, ring);
   Alarm.alarmRepeat(dowSunday, 11, 10, 0, ring);
-
-  // turn off builtin led
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
 
   // this pin serve as current to the switch
   pinMode(12, OUTPUT);
