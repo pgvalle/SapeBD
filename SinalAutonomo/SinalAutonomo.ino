@@ -9,7 +9,7 @@
  * to reconfigure time and date. Then, comment it back and reupload
  * the program. And don't forget to check the battery voltage!
  */
-//#define CONFIGURE_TIME_DATE
+//#define CONFIGURE_DATE_TIME
 
 #define BUTTON_PIN 13
 #define RINGER_PIN 7
@@ -23,7 +23,7 @@ RtcDS1302<ThreeWire> rtc(myWire);
 enum State
 {
   OFF, ON, RINGING
-} state;
+} state = OFF;
 
 AlarmID_t lastTurnOnAlarm = 0;
 
@@ -39,18 +39,16 @@ void setup()
   rtc.SetIsRunning(true);
   rtc.SetIsWriteProtected(false);
 
-#ifdef CONFIGURE_TIME_DATE
+#ifdef CONFIGURE_DATE_TIME
   rtc.SetDateTime(RtcDateTime(__DATE__, __TIME__));
-  printInformation();
 #else
-  if (!rtc.IsDateTimeValid())
-  {
-    Serial.println("Replace battery and reconfigure time and date!");
-  }
-
-  RtcDateTime now = rtc.GetDateTime();
-  setTime(now.Hour(), now.Minute(), now.Second(),
-          now.Day(), now.Month(), now.Year());  
+  // configure TimeLib with rtc
+  setSyncInterval(1440); // sync every 24 hours
+  setSyncProvider([]() -> time_t {
+    Serial.println("Synching with rtc");
+    printInformation();
+    return rtc.GetDateTime().Unix32Time();
+  });
 
   Alarm.alarmRepeat(dowSunday, 11, 0, 0, ring);
   Alarm.alarmRepeat(dowSunday, 11, 10, 0, ring);
@@ -69,7 +67,7 @@ void setup()
 
 void loop()
 {
-#ifdef CONFIGURE_TIME_DATE
+#ifdef CONFIGURE_DATE_TIME
   printInformation();
   delay(1000);
 #else
@@ -82,12 +80,11 @@ void loop()
   else
   {
     // set led according to state
-    static int count = 0;
+    static unsigned long count = 0;
     static bool blinkState = HIGH;
-    if (++count % 50 == 0)
+    if (++count % 100 == 0)
     {
       blinkState = !blinkState;
-      count = 0;
     }
     digitalWrite(LED_PIN, blinkState);
   }
@@ -116,6 +113,7 @@ void loop()
         lastTurnOnAlarm = 0;
         turnOn();
       }
+      break;
   }
 
   Alarm.delay(5);
@@ -124,7 +122,7 @@ void loop()
 
 void printInformation()
 {
-#ifndef CONFIGURE_TIME_DATE
+#ifndef CONFIGURE_DATE_TIME
   Serial.print("State: ");
   Serial.print(state);
   Serial.print(", ");
@@ -167,8 +165,7 @@ void turnOff()
 
 void ring()
 {
-  // Only makes sense to ring if state != off
-  if (state == OFF)
+  if (state == OFF || !rtc.IsDateTimeValid())
   {
     return;
   }
