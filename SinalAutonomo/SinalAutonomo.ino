@@ -1,3 +1,4 @@
+// dependencies: Rtc by Makuna, Time (Michael Margolis) and TimeAlarms (Michael Margolis)
 #include <ThreeWire.h>
 #include <RtcDS1302.h>
 
