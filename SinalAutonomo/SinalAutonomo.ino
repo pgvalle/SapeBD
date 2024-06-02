@@ -51,8 +51,15 @@ void setup()
     return rtc.GetDateTime().Unix32Time();
   });
 
+  // incio ebd
+  Alarm.alarmRepeat(dowSunday, 9, 0, 0, ring);
+
+  // final ebd
   Alarm.alarmRepeat(dowSunday, 11, 0, 0, ring);
   Alarm.alarmRepeat(dowSunday, 11, 10, 0, ring);
+
+  // culto a noite
+  Alarm.alarmRepeat(dowSunday, 18, 30, 0, ring);
 
   // this pin serve as current to the switch
   pinMode(12, OUTPUT);
