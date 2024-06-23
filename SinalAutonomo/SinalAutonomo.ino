@@ -1,16 +1,13 @@
-// dependencies: Rtc by Makuna, Time (Michael Margolis) and TimeAlarms (Michael Margolis)
+#include <SoftwareSerial.h>
+#include <WiFiEsp.h>  // WifiEsp
+
+#include <ArduinoJson.h>  // ArduinoJson
+
 #include <ThreeWire.h>
-#include <RtcDS1302.h>
+#include <RtcDS1302.h>  // Rtc by Makuna
 
-#include <TimeLib.h>
-#include <TimeAlarms.h>
-
-/**
- * Uncomment the define here and upload the program to your arduino
- * to reconfigure time and date. Then, comment it back and reupload
- * the program. And don't forget to check the battery voltage!
- */
-//#define CONFIGURE_DATE_TIME
+#include <TimeLib.h>  // Time by Michael Margolis
+#include <TimeAlarms.h>  // TimeAlarms by Michael Margolis
 
 #define BUTTON_PIN 13
 #define RINGER_PIN 7
@@ -18,19 +15,33 @@
 
 #define RING_DURATION 5 // in seconds
 
-ThreeWire myWire(9, 11, 5); // DAT, CLK, RST
+// Your WiFi credentials
+char ssid[] = "Mefibosete24";
+char pass[] = "papito12345";
+
+// Define the serial pins for the ESP-01 module
+SoftwareSerial espSerial(3, 2); // RX, TX
+
+JsonDocument jsonDoc;
+
+ThreeWire myWire(3, 4, 2); // DAT, CLK, RST
 RtcDS1302<ThreeWire> rtc(myWire);
+
+AlarmID_t lastTurnOnAlarm = 0;
 
 enum State
 {
   OFF, ON, RINGING
 } state = OFF;
 
-AlarmID_t lastTurnOnAlarm = 0;
-
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
+
+  // Initialize the WiFiEsp library with the software serial
+  espSerial.begin(9600);
+  WiFi.init(&espSerial);
+  WiFi.begin(ssid, pass);
 
   // turn off builtin led
   pinMode(LED_BUILTIN, OUTPUT);
@@ -40,15 +51,53 @@ void setup()
   rtc.SetIsRunning(true);
   rtc.SetIsWriteProtected(false);
 
-#ifdef CONFIGURE_DATE_TIME
-  rtc.SetDateTime(RtcDateTime(__DATE__, __TIME__));
-#else
   // configure TimeLib with rtc
-  setSyncInterval(1440); // sync every 24 hours
-  setSyncProvider([]() -> time_t {
-    Serial.println("Synching with rtc");
-    printInformation();
-    return rtc.GetDateTime().Unix32Time();
+  setSyncInterval(2880); // sync once each 2 days
+  setSyncProvider([]() -> time_t
+  {
+    if (WiFi.status() != WL_CONNECTED)
+    {
+      const uint8_t status = WiFi.begin(ssid, pass);
+      if (status != WL_CONNECTED)
+      {
+        return rtc.GetDateTime().Unix32Time();
+      }
+    }
+
+    WiFiEspClient client;
+
+    if (!client.connect("worldtimeapi.org", 80))
+    {
+      return rtc.GetDateTime().Unix32Time();
+    }
+
+    client.println("GET /api/timezone/America/Sao_Paulo HTTP/1.1");
+    client.println("Host: worldtimeapi.org");
+    client.println("Connection: close");
+    client.println();
+
+    // ignore everything before the json string
+    String response = client.readStringUntil('\n');
+    while (!response.startsWith("{")) {
+      response = client.readStringUntil('\n');
+    }
+
+    // remaindings?? IDK just to be sure
+    String remaining = client.readStringUntil('\n');
+    while (remaining.length() > 0) {
+      remaining = client.readStringUntil('\n');
+      response += remaining;
+    }
+
+    client.stop();
+
+    deserializeJson(jsonDoc, response);
+    const unsigned long unixTime = jsonDoc["unixtime"];
+    // sync rtc
+    RtcDateTime rtcDT(0);
+    rtcDT.InitWithUnix32Time(unixTime);
+    rtc.SetDateTime(rtcDT);
+    return unixTime;
   });
 
   // incio ebd
@@ -70,15 +119,22 @@ void setup()
   pinMode(LED_PIN, OUTPUT);
 
   turnOn();
-#endif
+}
+
+void blink()
+{
+  // set led according to state
+  static unsigned long count = 0;
+  static bool blinkState = HIGH;
+  if (++count % 100 == 0)
+  {
+    blinkState = !blinkState;
+  }
+  digitalWrite(LED_PIN, blinkState);
 }
 
 void loop()
 {
-#ifdef CONFIGURE_DATE_TIME
-  printInformation();
-  delay(1000);
-#else
   // Everything ok then just show on/off state
   if (rtc.IsDateTimeValid())
   {
@@ -87,14 +143,7 @@ void loop()
   // there's something wrong so say it with led blink
   else
   {
-    // set led according to state
-    static unsigned long count = 0;
-    static bool blinkState = HIGH;
-    if (++count % 100 == 0)
-    {
-      blinkState = !blinkState;
-    }
-    digitalWrite(LED_PIN, blinkState);
+    blink();
   }
 
   bool buttonPress = digitalRead(BUTTON_PIN);
@@ -125,17 +174,10 @@ void loop()
   }
 
   Alarm.delay(5);
-#endif
 }
 
 void printInformation()
 {
-#ifndef CONFIGURE_DATE_TIME
-  Serial.print("State: ");
-  Serial.print(state);
-  Serial.print(", ");
-#endif
-
   RtcDateTime now = rtc.GetDateTime();
 
   static char buffer[21];
