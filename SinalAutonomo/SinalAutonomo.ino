@@ -16,13 +16,11 @@ const int led    = 6;
 const int button = 8;
 
 // Your WiFi credentials
-char ssid[] = "Mefibosete24";
+char ssid[] = "IBS";
 char pass[] = "papito12345";
 
 // Define the serial pins for the ESP-01 module
 SoftwareSerial espSerial(10, 11);  // RX, TX
-
-JsonDocument jsonDoc;
 
 ThreeWire rtcWires(3, 4, 2);
 RtcDS1302<ThreeWire> rtc(rtcWires);  // DAT, CLK, RST
@@ -82,25 +80,17 @@ void setup()
       response = client.readStringUntil('\n');
     }
 
-    // remaindings?? IDK just to be sure
-    String remaining = client.readStringUntil('\n');
-    while (remaining.length() > 0) {
-      remaining = client.readStringUntil('\n');
-      response += remaining;
-    }
-
-    Serial.println(response);
-
     client.stop();
 
-    deserializeJson(jsonDoc, response);
-    long unixTime = jsonDoc["unixtime"];
-    Serial.println(unixTime);
-    // sync rtc
+    JsonDocument doc;
+    deserializeJson(doc, response);
+    const time_t unixTime = doc["unixtime"];
+  
+    // sync with rtc
     RtcDateTime rtcDT(0);
-    rtcDT.InitWithUnix32Time(unixTime);
+    rtcDT.InitWithUnix32Time(unixTime - 10800);
     rtc.SetDateTime(rtcDT);
-    return unixTime;
+    return unixTime - 10800;
   });
 
   // incio ebd
@@ -184,7 +174,9 @@ void printInformation()
           now.Hour(), now.Minute(), now.Second(),
           now.Day(), now.Month(), now.Year());
 
-  Serial.println(buffer);
+  Serial.print(buffer);
+  Serial.print(" ");
+  Serial.println(state);
 }
 
 void turnOn()
