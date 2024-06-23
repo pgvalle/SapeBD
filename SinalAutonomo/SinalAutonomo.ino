@@ -9,23 +9,23 @@
 #include <TimeLib.h>  // Time by Michael Margolis
 #include <TimeAlarms.h>  // TimeAlarms by Michael Margolis
 
-#define BUTTON_PIN 13
-#define RINGER_PIN 7
-#define LED_PIN 3
-
 #define RING_DURATION 5 // in seconds
+
+const int relay  = 13;
+const int led    = 6;
+const int button = 8;
 
 // Your WiFi credentials
 char ssid[] = "Mefibosete24";
 char pass[] = "papito12345";
 
 // Define the serial pins for the ESP-01 module
-SoftwareSerial espSerial(3, 2); // RX, TX
+SoftwareSerial espSerial(10, 11);  // RX, TX
 
 JsonDocument jsonDoc;
 
-ThreeWire myWire(3, 4, 2); // DAT, CLK, RST
-RtcDS1302<ThreeWire> rtc(myWire);
+ThreeWire rtcWires(3, 4, 2);
+RtcDS1302<ThreeWire> rtc(rtcWires);  // DAT, CLK, RST
 
 AlarmID_t lastTurnOnAlarm = 0;
 
@@ -52,7 +52,7 @@ void setup()
   rtc.SetIsWriteProtected(false);
 
   // configure TimeLib with rtc
-  setSyncInterval(2880); // sync once each 2 days
+  setSyncInterval(2880);  // sync once each 2 days
   setSyncProvider([]() -> time_t
   {
     if (WiFi.status() != WL_CONNECTED)
@@ -89,10 +89,13 @@ void setup()
       response += remaining;
     }
 
+    Serial.println(response);
+
     client.stop();
 
     deserializeJson(jsonDoc, response);
-    const unsigned long unixTime = jsonDoc["unixtime"];
+    long unixTime = jsonDoc["unixtime"];
+    Serial.println(unixTime);
     // sync rtc
     RtcDateTime rtcDT(0);
     rtcDT.InitWithUnix32Time(unixTime);
@@ -110,13 +113,9 @@ void setup()
   // culto a noite
   Alarm.alarmRepeat(dowSunday, 18, 30, 0, ring);
 
-  // this pin serve as current to the switch
-  pinMode(12, OUTPUT);
-  digitalWrite(12, HIGH);
-
-  pinMode(BUTTON_PIN, INPUT);
-  pinMode(RINGER_PIN, OUTPUT);
-  pinMode(LED_PIN, OUTPUT);
+  pinMode(button, INPUT);
+  pinMode(relay, OUTPUT);
+  pinMode(led, OUTPUT);
 
   turnOn();
 }
@@ -130,7 +129,7 @@ void blink()
   {
     blinkState = !blinkState;
   }
-  digitalWrite(LED_PIN, blinkState);
+  digitalWrite(led, blinkState);
 }
 
 void loop()
@@ -138,7 +137,7 @@ void loop()
   // Everything ok then just show on/off state
   if (rtc.IsDateTimeValid())
   {
-    digitalWrite(LED_PIN, state != OFF);
+    digitalWrite(led, state != OFF);
   }
   // there's something wrong so say it with led blink
   else
@@ -146,8 +145,8 @@ void loop()
     blink();
   }
 
-  bool buttonPress = digitalRead(BUTTON_PIN);
-  while(digitalRead(BUTTON_PIN))
+  bool buttonPress = digitalRead(button);
+  while(digitalRead(button))
   {
     buttonPress = true;
     Alarm.delay(5);
@@ -190,7 +189,7 @@ void printInformation()
 
 void turnOn()
 {
-  digitalWrite(RINGER_PIN, HIGH);
+  digitalWrite(relay, HIGH);
   state = ON;
 
   printInformation();
@@ -198,8 +197,8 @@ void turnOn()
 
 void turnOff()
 {
-  // RINGER_PIN serves as ground and grounding the ssr activates the ringer
-  digitalWrite(RINGER_PIN, HIGH);
+  // relay serves as ground and grounding the ssr activates the ringer
+  digitalWrite(relay, HIGH);
   state = OFF;
 
   // Forget turnOn alarm set previously
@@ -220,8 +219,8 @@ void ring()
     return;
   }
 
-  // RINGER_PIN serves as ground and grounding the ssr activates the ringer
-  digitalWrite(RINGER_PIN, LOW);
+  // relay serves as ground and grounding the ssr activates the ringer
+  digitalWrite(relay, LOW);
   state = RINGING;
 
   // Forget turnOn alarm set previously
