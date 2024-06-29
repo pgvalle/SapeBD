@@ -16,8 +16,8 @@ const int relay  = 12,
           button = 8;
 
 // Your WiFi credentials
-static const char ssid[] = "Mefibosete24",
-                  pass[] = "papito12345";
+static const char ssid[] = "SSID",
+                  pass[] = "password";
 
 // Define the serial pins for the ESP-01 module
 SoftwareSerial espSerial(10, 11);  // RX, TX
