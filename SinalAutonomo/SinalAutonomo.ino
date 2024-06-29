@@ -116,8 +116,16 @@ void printInformation()
           now.Day(), now.Month(), now.Year());
 
   Serial.print(buffer);
-  Serial.print(" ");
-  Serial.println(state);
+  Serial.print(", Alarm is ");
+  if (state == RINGING)
+  {
+    Serial.println("ringing");
+  }
+  else
+  {
+    Serial.print("turned ");
+    Serial.println(state ? "On" : "Off");
+  }
 }
 
 void turnOn()
